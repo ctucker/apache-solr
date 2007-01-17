@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN" "http://java.sun.com/dtd/web-app_2_3.dtd">
+<!--
+ Licensed to the Apache Software Foundation (ASF) under one or more
+ contributor license agreements.  See the NOTICE file distributed with
+ this work for additional information regarding copyright ownership.
+ The ASF licenses this file to You under the Apache License, Version 2.0
+ (the "License"); you may not use this file except in compliance with
+ the License.  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
+<web-app>
+
+  <!-- Uncomment if you are trying to use a Resin version before 3.0.19.
+    Their XML implementation isn't entirely compatible with Xerces.
+    Below are the implementations to use with Sun's JVM.
+  <system-property javax.xml.xpath.XPathFactory=
+             "com.sun.org.apache.xpath.internal.jaxp.XPathFactoryImpl"/>
+  <system-property javax.xml.parsers.DocumentBuilderFactory=
+             "com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl"/>
+  <system-property javax.xml.parsers.SAXParserFactory=
+             "com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"/>
+   -->
+
+
+  <servlet>
+    <servlet-name>SolrServer</servlet-name>
+    <display-name>Solr</display-name>
+    <description>Solr Server</description>
+    <servlet-class>org.apache.solr.servlet.SolrServlet</servlet-class>
+    <load-on-startup>1</load-on-startup>
+  </servlet>
+
+  <servlet>
+    <servlet-name>SolrUpdate</servlet-name>
+    <display-name>SolrUpdate</display-name>
+    <description>Solr Update Handler</description>
+    <servlet-class>org.apache.solr.servlet.SolrUpdateServlet</servlet-class>
+    <load-on-startup>2</load-on-startup>
+  </servlet>
+
+  <servlet>
+    <servlet-name>ping</servlet-name>
+    <jsp-file>/admin/ping.jsp</jsp-file>
+  </servlet>
+
+  <servlet-mapping>
+    <servlet-name>SolrServer</servlet-name>
+    <url-pattern>/select/*</url-pattern>
+  </servlet-mapping>
+
+  <servlet-mapping>
+    <servlet-name>SolrUpdate</servlet-name>
+    <url-pattern>/update/*</url-pattern>
+  </servlet-mapping>
+
+  <servlet-mapping>
+    <servlet-name>ping</servlet-name>
+    <url-pattern>/admin/ping</url-pattern>
+  </servlet-mapping>
+  
+  <mime-mapping>
+    <extension>.xsl</extension>
+    <!-- per http://www.w3.org/TR/2006/PR-xslt20-20061121/ -->
+    <mime-type>application/xslt+xml</mime-type>
+  </mime-mapping>
+
+</web-app>

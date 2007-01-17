@@ -1,0 +1,472 @@
+<!-- Solr build file -->
+
+<!--
+ Licensed to the Apache Software Foundation (ASF) under one or more
+ contributor license agreements.  See the NOTICE file distributed with
+ this work for additional information regarding copyright ownership.
+ The ASF licenses this file to You under the Apache License, Version 2.0
+ (the "License"); you may not use this file except in compliance with
+ the License.  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
+<project name="solr" default="usage" basedir=".">
+  <!-- Initialize property values: allow easy customization via build.properties -->
+  <property file="build.properties" />
+
+  <property name="Name" value="Solr" />
+
+  <tstamp>
+    <format property="year" pattern="yyyy"/>
+    <format property="DSTAMP" pattern="yyyy-MM-dd"/>
+    <format property="TSTAMP" pattern="HH:mm:ss"/>
+    <!-- datetime format that is safe to treat as part of a dotted version -->
+    <format property="dateversion" pattern="yyyy.MM.dd.HH.mm.ss" />
+  </tstamp>
+
+  <!-- Java Version we are compatible with -->
+  <property name="java.compat.version" value="1.5" />
+
+  <!-- Solr Implimentation Version -->
+  <!--
+       This can be any string value that does not include spaces
+       This will be used when creating build artifact file names.
+
+       By default, this should be set to "X.Y.N-dev" where X.Y.N is
+       "1 greater" then the last version released (on this branch).
+    -->
+  <property name="version" value="1.2-dev" />
+  
+  <!-- Solr Specification Version -->
+  <!--
+       This will be used in the Manifest file, and therefore must
+       match the pattern "digit+{.digit+}*"
+       
+       By default, this should be set to "X.Y.M.${dateversion}"
+       where X.Y.M is the last version released (on this branch).
+    -->
+  <property name="specversion" value="1.1.${dateversion}" />
+
+  <!-- Incubation Artifact Disclaimer Suffix -->
+  <!-- Once graduated from incubation, find/remove all refs to this prop -->
+  <property name="incubation-suffix" value="-incubating" />
+  
+  <!-- 3rd party libraries for compilation -->
+  <property name="lib" value="lib" />
+
+  <!-- solr source files -->
+  <property name="src" value="src" />
+
+  <!-- Destination for compiled classes and binaries -->
+  <property name="dest" value="build" />
+
+  <!-- Destination for distribution files (demo WAR, src distro, etc.) -->
+  <property name="dist" value="dist" />
+
+  <!-- Type of checksum to compute for distribution files -->
+  <property name="checksum.algorithm" value="md5" />
+
+  <!-- Example directory -->
+  <property name="example" value="example" />
+
+  <property name="fullname" value="apache-${ant.project.name}"/>
+  <property name="fullnamever" value="apache-${ant.project.name}-${version}${incubation-suffix}"/>
+
+  <!-- Javadoc properties -->
+  <property name="javadoc.years" value="2006 - ${year}" />
+  <property name="build.docs" value="${dest}/docs"/>
+  <property name="build.javadoc" value="${build.docs}/api"/>
+  <property name="javadoc.access" value="protected"/>
+  <property name="javadoc.link.java"
+            value="http://java.sun.com/j2se/1.5.0/docs/api/"/>
+  <property name="javadoc.link.junit"
+            value="http://junit.sourceforge.net/javadoc/"/>
+  <property name="javadoc.link.lucene"
+            value="http://lucene.apache.org/java/docs/api/"/>
+  <property name="javadoc.packages" value="org.apache.solr.*"/>
+
+  <!-- JUnit properties -->
+  <property name="junit.output.dir" location="${dest}/test-results"/>
+  <property name="junit.reports" location="${dest}/test-results/reports"/>
+  <property name="junit.includes" value="**/Test*.java,**/*Test.java"/>
+  <available property="junitPresent"
+             classname="junit.framework.TestCase" />
+
+  <!-- Macro for building checksum files
+       This is only needed until the "format" option is supported
+       by ant's built in checksum task
+   -->
+  <macrodef name="solr-checksum">
+    <attribute name="file"/>
+    <!-- NOTE: we use the value of @{file} in the names any properties
+         set because macro's don't have variables, and otherwise we
+         wouldn't be able to checksum more then one file per build
+      -->
+    <sequential>
+     <checksum file="@{file}"
+               property="@{file}.sum"
+               algorithm="${checksum.algorithm}" />
+     <basename file="@{file}" property="@{file}.base" />
+     <concat destfile="@{file}.${checksum.algorithm}"
+             force="yes"
+             append="false"
+             fixlastline="yes">
+       <header trimleading="yes">${@{file}.sum}  </header>
+       <!-- empty fileset to trick concat -->
+       <fileset dir="." excludes="**" />
+       <footer trimleading="yes">${@{file}.base}
+       </footer>
+     </concat>
+    </sequential>
+  </macrodef>
+  
+  <!-- Default target: usage.  Prints out instructions. -->
+  <target name="usage"
+          description="Prints out instructions">
+    <echo message="Welcome to the Solr project!" />
+    <echo message="Use 'ant example' to create a runnable example configuration." />
+    <echo message="And for developers:"/>
+    <echo message="Use 'ant clean' to clean compiled files." />
+    <echo message="Use 'ant compile' to compile the source code." />
+    <echo message="Use 'ant dist' to build the project WAR and JAR files." />
+    <echo message="Use 'ant package' to build a .zip and .tgz for distribution." />
+    <echo message="Use 'ant test' to run unit tests." />
+  </target>
+
+  <!-- Clean: cleans compiled files and other temporary artifacts. -->
+  <target name="clean"
+          description="Cleans compiled files and other temporary artifacts.">
+    <delete dir="${dest}" />
+    <delete dir="${dist}" />
+  </target>
+
+
+  <!-- ========================================================================= -->
+  <!-- ===================== COMPILATION-RELATED TASKS ========================= -->
+  <!-- ========================================================================= -->
+
+
+  <!-- The compilation classpath -->
+  <path id="compile.classpath">
+    <fileset dir="${lib}">
+      <include name="*.jar" />
+    </fileset>
+  </path>
+
+  <!-- Compile the project. -->
+  <target name="compile"
+          description="Compile the source code."
+          depends="checkJunitPresence">
+
+    <mkdir dir="${dest}" />
+
+    <javac destdir="${dest}"
+           target="${java.compat.version}"
+           source="${java.compat.version}"
+           debug="on"
+           encoding="utf8"
+           classpathref="compile.classpath">
+      <src path="${src}/java" />
+      <src path="${src}/webapp/src" />
+
+    </javac>
+  </target>
+
+
+  <target name="javadoc" depends="compile"
+          description="Generates javadoc documentation.">
+
+    <mkdir dir="${build.javadoc}"/>
+        
+    <!-- we do this to make sure whatever classes where in ant's
+         classpath at runtime are in the classpath used by javadoc
+         (ie: junit.jar)
+     -->
+    <path id="javadoc.classpath">
+       <path refid="compile.classpath"/>
+       <!-- aparently ant.library.dir isn't allways set right? -->
+       <fileset dir="${ant.home}/lib">
+          <include name="**/*.jar"/>
+       </fileset>
+       <fileset dir="${ant.library.dir}">
+          <include name="**/*.jar"/>
+       </fileset>
+    </path>
+
+    <javadoc
+      destdir="${build.javadoc}"
+      author="true"
+      version="true"
+      use="true"
+      encoding="utf8"
+      access="${javadoc.access}"
+      windowtitle="${Name} ${version}${incubation-suffix} API"
+      doctitle="${Name} ${version}${incubation-suffix} API (${specversion})"
+      bottom="Copyright &amp;copy; ${javadoc.years} The Apache Software Foundation"
+      >
+        <packageset dir="${src}/java"/>
+        <packageset dir="${src}/webapp/src"/>
+        <link href="${javadoc.link.java}"/>
+        <link href="${javadoc.link.junit}"/>
+        <link href="${javadoc.link.lucene}"/>
+        <classpath refid="javadoc.classpath"/>
+    </javadoc>
+  </target>
+  
+
+  <!-- ========================================================================= -->
+  <!-- ===================== TESTING-RELATED TASKS ============================= -->
+  <!-- ========================================================================= -->
+
+
+  <!-- Classpath for unit test compilation. -->
+  <!-- For now, it's the same as main classpath.  Later it will have JUnit, Clover, etc. -->
+  <path id="test.compile.classpath">
+    <path refid="compile.classpath" />
+    <pathelement location="${dest}"/>
+  </path>
+
+  <path id="test.run.classpath">
+    <path refid="test.compile.classpath" />
+    <pathelement location="${dest}/tests"/>
+  </path>
+
+  <!-- Check that JUnit is present. -->
+  <target name="checkJunitPresence">
+    <!-- no description so it doesn't show up in -projecthelp -->  
+    <fail unless="junitPresent"> 
+      ##################################################################
+      JUnit not found.
+      Please make sure junit.jar is in ANT_HOME/lib, or made available
+      to Ant using other mechanisms like -lib or CLASSPATH.
+      ##################################################################
+    </fail>
+  </target>
+
+  <!-- Compile unit tests. -->
+  <target name="compileTests"
+          description="Compile unit tests."
+          depends="compile,checkJunitPresence">
+
+    <mkdir dir="${dest}/tests" />
+    <javac 
+       destdir="${dest}/tests"
+       target="${java.compat.version}"
+       source="${java.compat.version}"
+       debug="on"
+       encoding="utf8"
+       classpathref="test.compile.classpath">
+      <src path="${src}/test" />
+    </javac>
+  </target>
+
+  <!-- Run unit tests. -->
+  <target name="test"
+          description="Runs the unit tests."
+          depends="compileTests, junit" />
+  
+  <target name="junit" depends="compileTests">
+    <!-- no description so it doesn't show up in -projecthelp -->  
+    <mkdir dir="${junit.output.dir}"/>
+
+    <junit printsummary="withOutAndErr"
+           haltonfailure="no"
+           errorProperty="tests.failed"
+           failureProperty="tests.failed"
+           dir="src/test/test-files/"
+           >
+      <syspropertyset>
+        <propertyref prefix="solr" />
+      </syspropertyset>
+      <classpath refid="test.run.classpath"/>
+      <formatter type="xml"/>
+      <batchtest fork="yes" todir="${junit.output.dir}" unless="testcase">
+        <fileset dir="src/test" includes="${junit.includes}"/>
+      </batchtest>
+      <batchtest fork="yes" todir="${junit.output.dir}" if="testcase">
+        <fileset dir="src/test" includes="**/${testcase}.java"/>
+      </batchtest>
+    </junit>
+
+    <fail if="tests.failed">Tests failed!</fail>
+  </target>
+  
+  <target name="test-reports"
+          description="Generates HTML test reports.">
+    <mkdir dir="${junit.reports}"/>
+    <junitreport todir="${junit.output.dir}">
+      <fileset dir="${junit.output.dir}">
+        <include name="TEST-*.xml"/>
+      </fileset>
+      <report format="frames" todir="${junit.reports}"/>
+    </junitreport>
+  </target>
+
+
+  <!-- ========================================================================= -->
+  <!-- ===================== DISTRIBUTION-RELATED TASKS ======================== -->
+  <!-- ========================================================================= -->
+
+
+  <!-- Creates the Solr distribution files. -->
+  <target name="dist"
+          description="Creates the Solr distribution files."
+          depends="dist-war, dist-jar" />
+
+  <!-- Creates a Manifest file for Jars and WARs -->
+  <target name="make-manifest" >
+     <!-- no description, don't advertise -->
+     <mkdir dir="${dest}/META-INF/" />
+     <manifest mode="replace" file="${dest}/META-INF/MANIFEST.MF">
+        <!--
+        http://java.sun.com/j2se/1.5.0/docs/guide/jar/jar.html#JAR%20Manifest
+        http://java.sun.com/j2se/1.5.0/docs/guide/versioning/spec/versioning2.html
+        http://java.sun.com/j2se/1.5.0/docs/api/java/lang/Package.html
+        http://java.sun.com/j2se/1.5.0/docs/api/java/util/jar/package-summary.html
+        http://java.sun.com/developer/Books/javaprogramming/JAR/basics/manifest.html
+        -->
+        <!-- Don't set 'Manifest-Version' it identifies the version of the
+             manifest file format, and should allways be 1.0 (the default)
+
+             Don't set 'Created-by' attribute, it's purpose is 
+             to identify the version of java used to build the jar,
+             which ant will do by default.
+
+             Ant will happily override these with bogus strings if you
+             tell it to, so don't.
+
+             NOTE: we don't use section info because all of our manifest data
+             applies to the entire jar/war ... no package specific info.
+        -->
+        <attribute name="Extension-Name" 
+                   value="org.apache.solr"/>
+        <attribute name="Specification-Title" 
+                   value="Apache Solr Search Server"/>
+        <!-- spec version must match "digit+{.digit+}*" -->
+        <attribute name="Specification-Version" 
+                   value="${specversion}"/>
+        <attribute name="Specification-Vendor" 
+                   value="The Apache Software Foundation"/>
+        <attribute name="Implementation-Title" 
+                   value="org.apache.solr"/>
+        <!-- impl version can be any string -->
+        <attribute name="Implementation-Version" 
+                   value="${version}${incubation-suffix} - ${user.name} - ${DSTAMP} ${TSTAMP}"/>
+        <attribute name="Implementation-Vendor" 
+                   value="The Apache Software Foundation"/>
+        <attribute name="X-Compile-Source-JDK" 
+                   value="${java.compat.version}"/>
+        <attribute name="X-Compile-Target-JDK" 
+                   value="${java.compat.version}"/>
+     </manifest>
+  </target>
+
+  <!-- Creates the Solr WAR file. -->
+  <target name="dist-war"
+          description="Creates the Solr WAR Distribution file."
+          depends="compile, make-manifest, dist-jar">
+    <mkdir dir="${dist}" />
+    <war destfile="${dist}/${fullnamever}.war"
+         webxml="${src}/webapp/WEB-INF/web.xml"
+         filesetmanifest="skip"
+         manifest="${dest}/META-INF/MANIFEST.MF">
+       <lib dir="${lib}">
+         <exclude name="servlet-api*.jar" />
+       </lib>
+       <lib dir="${dist}">
+         <include name="${fullnamever}.jar" />
+       </lib>
+       <fileset dir="${src}/webapp/resources" />
+       <metainf dir="${basedir}" includes="LICENSE.txt,NOTICE.txt"/>
+    </war>
+  </target>
+
+  <!-- Creates the solr jar. -->
+  <target name="dist-jar"
+          description="Creates the Solr JAR Distribution file."
+          depends="compile, make-manifest">
+    <mkdir dir="${dist}" />
+    <jar destfile="${dist}/${fullnamever}.jar"
+         basedir="${dest}"
+         includes="org/apache/**"
+         filesetmanifest="skip"
+         manifest="${dest}/META-INF/MANIFEST.MF">
+	 <metainf dir="${basedir}" includes="LICENSE.txt,NOTICE.txt"/>
+    </jar>
+  </target>
+
+  <target name="example" 
+          description="Creates a runnable example configuration."
+          depends="dist-war">
+    <copy file="${dist}/${fullnamever}.war"
+          tofile="${example}/webapps/${ant.project.name}.war"/>
+    <copy todir="${example}/solr/bin">
+      <fileset dir="${src}/scripts">
+        <exclude name="scripts.conf"/>
+      </fileset>
+    </copy>
+    <chmod dir="${example}/solr/bin" perm="755" includes="**"/>
+    <echo>See ${example}/README.txt for how to run the Solr example configuration.</echo>
+  </target>
+
+  <!-- make a distribution -->
+  <target name="package"
+          description="Packages the Solr Distribution files and Documentation."
+          depends="dist, example, javadoc">
+
+    <copy todir="${build.docs}">
+      <fileset dir="site" />
+    </copy>
+
+    <tar destfile="${dist}/${fullnamever}.tgz" compression="gzip">
+      <tarfileset dir="."
+        prefix="${fullnamever}"
+        includes="LICENSE.txt NOTICE.txt *.txt *.xml lib/** src/** example/**"
+        excludes="**/data/ **/logs/ **/classes/ **/*.sh **/bin/ src/scripts/" />
+      <tarfileset dir="."
+        mode="755"
+        prefix="${fullnamever}"
+        includes="**/*.sh **/bin/ src/scripts/" />
+      <tarfileset dir="."
+        prefix="${fullnamever}"
+        includes="dist/*.jar dist/*.war" />
+      <tarfileset dir="${build.docs}"
+        prefix="${fullnamever}/docs/" />
+    </tar>
+    <solr-checksum file="${dist}/${fullnamever}.tgz"/>
+
+    <gunzip src="${dist}/${fullnamever}.tgz" dest="${dest}/${fullnamever}.tar"/>
+    <untar src="${dest}/${fullnamever}.tar" dest="${dest}"/>
+
+    <fixcrlf srcdir="${dest}/${fullnamever}"
+       eol="crlf"
+       includes="**/*.txt **/*.xml **/*.java **/*.html **/*.csv **/*.css **/*.properties **/*.jsp **/*.xsl **/*.py **/*.rb **/*.js **/*.json **/*.pl"
+     />
+
+    <zip destfile="${dist}/${fullnamever}.zip">
+      <zipfileset dir="${dest}/${fullnamever}" 
+        prefix="${fullnamever}" 
+        excludes="**/*.sh **/bin/ src/scripts/" />
+      <zipfileset dir="${dest}/${fullnamever}" 
+        prefix="${fullnamever}" 
+        includes="**/*.sh **/bin/ src/scripts/"
+        filemode="755" />
+    </zip>
+    <solr-checksum file="${dist}/${fullnamever}.zip"/>
+
+  </target>
+
+  <target name="nightly"
+          depends="test, package">
+     <!-- no description, don't advertise -->
+  </target>
+
+</project>
+

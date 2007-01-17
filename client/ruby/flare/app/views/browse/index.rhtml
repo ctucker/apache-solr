@@ -1,0 +1,14 @@
+<% form_tag(:action=>'add_query') do %>
+  Query: <%=text_field_tag 'query'%>
+<% end %>
+<%=link_to 'clear constraints', :action => 'clear'%>
+Queries: <%=session[:queries].join(' AND ')%>
+Filters: <%=session[:filters].join(' >>> ')%>
+
+Found: <%=@results['response']['numFound']%>
+<ul>
+  <% @results['response']['docs'].each do |doc| %>
+    <li><%=doc.inspect%></li>
+  <% end %>
+</ul>
+<%=debug @results['responseHeader']%>
